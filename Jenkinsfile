@@ -2,14 +2,22 @@ pipeline {
     agent any
 
     environment {
-        REGISTRY = 'igris08' 
-        IMAGE_NAME = 'java-microservice'
+        IMAGE_NAME = "igris08/java-microservice"
+    }
+
+    triggers {
+        pollSCM('* * * * *')
     }
 
     stages {
-        stage('Build & Test') {
+        stage('Checkout') {
             steps {
-                echo "Running Maven build on branch: ${env.BRANCH_NAME}"
+                checkout scm
+            }
+        }
+
+        stage('Build with Maven') {
+            steps {
                 sh 'mvn clean package'
             }
         }
@@ -20,8 +28,13 @@ pipeline {
             }
             steps {
                 script {
-                    def imageTag = "${REGISTRY}/${IMAGE_NAME}:${env.BUILD_NUMBER}"
+                    def imageTag = "${env.IMAGE_NAME}:${env.BUILD_NUMBER}"
                     sh "docker build -t ${imageTag} ."
+
+                    withCredentials([usernamePassword(credentialsId: 'docker_creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                        sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
+                    }
+
                     sh "docker push ${imageTag}"
                 }
             }
@@ -32,18 +45,10 @@ pipeline {
                 branch 'develop'
             }
             steps {
-                sh 'kubectl apply -f k8s/deployment.yaml'
-                sh 'kubectl apply -f k8s/service.yaml'
+                script {
+                    sh 'kubectl apply -f k8s/'
+                }
             }
-        }
-    }
-
-    post {
-        failure {
-            echo "Pipeline failed for branch: ${env.BRANCH_NAME}"
-        }
-        success {
-            echo "Pipeline completed successfully for branch: ${env.BRANCH_NAME}"
         }
     }
 }
