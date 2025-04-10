@@ -18,7 +18,9 @@ pipeline {
 
         stage('Build with Maven') {
             steps {
-                sh 'mvn clean package'
+                dir('java-microservice') {
+                    sh 'mvn clean package'
+                }
             }
         }
 
@@ -27,15 +29,17 @@ pipeline {
                 branch 'develop'
             }
             steps {
-                script {
-                    def imageTag = "${env.IMAGE_NAME}:${env.BUILD_NUMBER}"
-                    sh "docker build -t ${imageTag} ."
+                dir('java-microservice') {
+                    script {
+                        def imageTag = "${env.IMAGE_NAME}:${env.BUILD_NUMBER}"
+                        sh "docker build -t ${imageTag} ."
 
-                    withCredentials([usernamePassword(credentialsId: 'docker_creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                        sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
+                        withCredentials([usernamePassword(credentialsId: 'docker_creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                            sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
+                        }
+
+                        sh "docker push ${imageTag}"
                     }
-
-                    sh "docker push ${imageTag}"
                 }
             }
         }
@@ -45,9 +49,7 @@ pipeline {
                 branch 'develop'
             }
             steps {
-                script {
-                    sh 'kubectl apply -f k8s/'
-                }
+                sh 'kubectl apply -f k8s/'
             }
         }
     }
