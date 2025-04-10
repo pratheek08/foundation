@@ -46,8 +46,12 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             when {
-                branch 'develop'
-            }
+    anyOf {
+        branch 'main'
+        branch 'develop'
+    }
+}
+
             steps {
                 sh 'kubectl apply -f k8s/'
             }
